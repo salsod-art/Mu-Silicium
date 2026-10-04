@@ -1,0 +1,54 @@
+name: Test Mu-Silicium Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Check repository
+        run: |
+          echo "Repository:"
+          pwd
+          echo
+          ls -la
+          echo
+          test -f build_uefi.py
+          test -f setup_env.sh
+          test -f pip-requirements.txt
+          echo "Mu-Silicium source files found."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          chmod +x setup_env.sh
+          ./setup_env.sh -p apt
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install -r pip-requirements.txt
+
+      - name: Inspect device tree
+        run: |
+          echo "Searching for nio:"
+          grep -Rni --exclude-dir=.git "nio" . || true
+          echo
+          echo "Searching for SM8250:"
+          grep -Rni --exclude-dir=.git "SM8250" Platforms Silicon Resources Binaries 2>/dev/null | head -100 || true
+
+      - name: List platform directories
+        run: |
+          echo "Platforms:"
+          find Platforms -maxdepth 3 -type d | sort
