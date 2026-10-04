@@ -1,73 +1,81 @@
-name: Get Moto G100 Firmware
+name: Inspect Moto G100 Firmware
 
 on:
   workflow_dispatch:
 
 jobs:
-  firmware:
+  inspect:
     runs-on: ubuntu-24.04
 
     steps:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip p7zip-full device-tree-compiler
+          sudo apt-get install -y unzip p7zip-full device-tree-compiler wget
 
-      - name: Download G100 firmware
+      - name: Download firmware
         run: |
           wget -O nio-firmware.zip \
             "https://mirrors-obs-1.lolinet.com/firmware/lenomola/2021/nio/official/TIMIT/XT2125-4_NIO_RETEU_12_S1RTS32.41-20-16-1-9_subsidy-DEFAULT_regulatory-DEFAULT_CFC.xml.zip"
-
-      - name: Check downloaded archive
-        run: |
-          ls -lh nio-firmware.zip
-          unzip -l nio-firmware.zip | head -100
 
       - name: Extract firmware
         run: |
           mkdir firmware
           unzip -q nio-firmware.zip -d firmware
 
-      - name: Find important files
+      - name: Inspect XML for bootloader
         run: |
-          echo "===== XBL ====="
-          find firmware -type f \
-            \( -iname "*xbl*" -o -iname "*uefi*" \) \
-            -printf "%p  %k KB\n" | sort
+          echo "===== flashfile.xml ====="
+          grep -niE 'xbl|uefi|bootloader|abl|partition' \
+            firmware/flashfile.xml | head -300 || true
 
           echo
-          echo "===== BOOT ====="
-          find firmware -type f \
-            \( -iname "boot.img" -o -iname "*boot*" \) \
-            -printf "%p  %k KB\n" | sort
+          echo "===== servicefile.xml ====="
+          grep -niE 'xbl|uefi|bootloader|abl|partition' \
+            firmware/servicefile.xml | head -300 || true
 
-          echo
+      - name: Download magiskboot
+        run: |
+          wget -O magiskboot \
+            "https://github.com/WildKernels/magiskboot/releases/download/nightly/magiskboot"
+          chmod +x magiskboot
+
+      - name: Extract boot image
+        run: |
+          mkdir boot-unpacked
+          cd boot-unpacked
+          ../magiskboot unpack ../firmware/boot.img
+          echo "===== Extracted files ====="
+          ls -lh
+
+      - name: Inspect extracted DTB
+        run: |
+          mkdir -p dtb-output
+
+          if [ -f boot-unpacked/dtb ]; then
+            cp boot-unpacked/dtb dtb-output/nio.dtb
+          elif [ -f boot-unpacked/kernel_dtb ]; then
+            cp boot-unpacked/kernel_dtb dtb-output/nio.dtb
+          else
+            echo "No DTB was extracted."
+            exit 1
+          fi
+
+          dtc -I dtb -O dts \
+            -o dtb-output/nio.dts \
+            dtb-output/nio.dtb
+
           echo "===== DTB ====="
-          find firmware -type f \
-            \( -iname "*.dtb" -o -iname "*.dtbo" \) \
-            -printf "%p  %k KB\n" | sort
+          ls -lh dtb-output/
 
           echo
-          echo "===== ALL IMAGE FILES ====="
-          find firmware -type f \
-            \( -iname "*.img" -o -iname "*.bin" \) \
-            -printf "%p  %k KB\n" | sort
+          echo "===== Device tree identity ====="
+          head -40 dtb-output/nio.dts
 
-      - name: Show archive metadata
-        run: |
-          find firmware -maxdepth 2 -type f \
-            \( -iname "*.xml" -o -iname "*.txt" \) \
-            -print
-
-      - name: Upload firmware pieces
+      - name: Upload small outputs
         uses: actions/upload-artifact@v4
         with:
-          name: nio-stock-firmware
+          name: nio-dtb-and-firmware-info
           path: |
-            firmware/**/xbl*.img
-            firmware/**/boot.img
-            firmware/**/*.dtb
-            firmware/**/*.dtbo
-            firmware/**/*.bin
-            firmware/**/*.xml
-          if-no-files-found: warn
+            dtb-output/nio.dtb
+            dtb-output/nio.dts
