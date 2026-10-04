@@ -8,88 +8,85 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout Mu-Silicium
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Verify repository
+      - name: Inspect DeviceBuild.py
         run: |
-          echo "=== Repository ==="
-          pwd
-          echo
-          ls -la
+          echo "===== DeviceBuild.py ====="
+          cat Platforms/Xiaomi/aliothPkg/DeviceBuild.py
 
-          echo
-          echo "=== Required files ==="
-          test -f build_uefi.py
-          test -f setup_env.sh
-          test -f pip-requirements.txt
-          echo "Required files found."
-
-      - name: Inspect alioth platform
+      - name: Inspect MemoryMapLib
         run: |
-          echo "=== ALIOTH FILES ==="
-          find Platforms/Xiaomi/aliothPkg -type f -print | sort
+          echo "===== MemoryMapLib.c ====="
+          cat Platforms/Xiaomi/aliothPkg/Library/MemoryMapLib/MemoryMapLib.c
 
           echo
-          echo "=== ALIOTH DIRECTORIES ==="
-          find Platforms/Xiaomi/aliothPkg -type d -print | sort
+          echo "===== MemoryMapLib.inf ====="
+          cat Platforms/Xiaomi/aliothPkg/Library/MemoryMapLib/MemoryMapLib.inf
 
-      - name: Inspect alioth build files
+      - name: Inspect ConfigurationMapLib
         run: |
-          echo "=== ALIOTH DSC ==="
-          sed -n '1,220p' Platforms/Xiaomi/aliothPkg/alioth.dsc
+          echo "===== ConfigurationMapLib.c ====="
+          cat Platforms/Xiaomi/aliothPkg/Library/ConfigurationMapLib/ConfigurationMapLib.c
 
           echo
-          echo "=== ALIOTH FDF ==="
-          sed -n '1,220p' Platforms/Xiaomi/aliothPkg/alioth.fdf
+          echo "===== ConfigurationMapLib.inf ====="
+          cat Platforms/Xiaomi/aliothPkg/Library/ConfigurationMapLib/ConfigurationMapLib.inf
+
+      - name: Inspect firmware configs
+        run: |
+          echo "===== uefiplat.cfg ====="
+          cat Binaries/alioth/RawFiles/uefiplat.cfg
 
           echo
-          echo "=== ALIOTH DEC ==="
-          sed -n '1,160p' Platforms/Xiaomi/aliothPkg/alioth.dec
+          echo "===== uefipil.cfg ====="
+          cat Binaries/alioth/RawFiles/uefipil.cfg
 
-      - name: Inspect alioth libraries
+      - name: Inspect binary README
         run: |
-          echo "=== ALIOTH LIBRARIES ==="
-          find Platforms/Xiaomi/aliothPkg/Library \
-            -type f -print | sort
+          echo "===== Binaries/alioth/README.md ====="
+          cat Binaries/alioth/README.md
 
-      - name: Inspect alioth binaries
+      - name: Inspect include files
         run: |
-          echo "=== ALIOTH BINARIES ==="
-          find Binaries/alioth \
-            -type f -print | sort
+          for f in \
+            Platforms/Xiaomi/aliothPkg/Include/APRIORI.inc \
+            Platforms/Xiaomi/aliothPkg/Include/DXE.inc \
+            Platforms/Xiaomi/aliothPkg/Include/RAW.inc
+          do
+            echo
+            echo "===== $f ====="
+            cat "$f"
+          done
 
-      - name: Inspect alioth DTB
+      - name: Inspect device tree
         run: |
-          echo "=== ALIOTH DTB/DTS ==="
-          ls -lh Resources/DTBs/alioth.* 2>/dev/null || true
+          echo "===== DTB files ====="
+          ls -lh Resources/DTBs/alioth.*
 
           echo
-          echo "=== DTB DIRECTORY MATCHES ==="
-          find Resources/DTBs -maxdepth 1 \
-            \( -name "alioth.*" -o -iname "*sm8250*alioth*" \) \
-            -print | sort
+          echo "===== DTB header ====="
+          file Resources/DTBs/alioth.dtb
 
-      - name: Inspect SM8250 configuration
-        run: |
-          echo "=== ALIOTH SM8250 REFERENCES ==="
-          grep -Rni \
-            --exclude-dir=.git \
-            -E "SM8250|SM8250-AC|Kona" \
-            Platforms/Xiaomi/aliothPkg \
-            Silicon/Qualcomm \
-            2>/dev/null | head -200
+          echo
+          echo "===== DTS beginning ====="
+          sed -n '1,180p' Resources/DTBs/alioth.dts
 
-      - name: Inspect build configuration
+      - name: Locate alioth build configuration
         run: |
-          echo "=== DEVICE REFERENCES ==="
-          grep -Rni \
-            --exclude-dir=.git \
-            -E "alioth|build_uefi" \
+          echo "===== Files containing alioth target references ====="
+          grep -Rni --exclude-dir=.git "alioth" \
+            Resources/Configs \
+            Resources/Scripts \
             build_uefi.py \
-            *.py \
-            Platforms \
-            2>/dev/null | head -250
+            Platforms/Xiaomi/aliothPkg \
+            2>/dev/null | head -300
+
+      - name: Inspect project status
+        run: |
+          echo "===== Relevant Status entries ====="
+          grep -ni "alioth" Status.md || true
