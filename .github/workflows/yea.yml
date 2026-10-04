@@ -1,54 +1,95 @@
-name: Test Mu-Silicium Build
+name: Inspect Alioth Port
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  inspect:
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Mu-Silicium
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Check repository
+      - name: Verify repository
         run: |
-          echo "Repository:"
+          echo "=== Repository ==="
           pwd
           echo
           ls -la
+
           echo
+          echo "=== Required files ==="
           test -f build_uefi.py
           test -f setup_env.sh
           test -f pip-requirements.txt
-          echo "Mu-Silicium source files found."
+          echo "Required files found."
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
+      - name: Inspect alioth platform
         run: |
-          chmod +x setup_env.sh
-          ./setup_env.sh -p apt
+          echo "=== ALIOTH FILES ==="
+          find Platforms/Xiaomi/aliothPkg -type f -print | sort
 
-      - name: Install Python dependencies
-        run: |
-          python3 -m pip install -r pip-requirements.txt
-
-      - name: Inspect device tree
-        run: |
-          echo "Searching for nio:"
-          grep -Rni --exclude-dir=.git "nio" . || true
           echo
-          echo "Searching for SM8250:"
-          grep -Rni --exclude-dir=.git "SM8250" Platforms Silicon Resources Binaries 2>/dev/null | head -100 || true
+          echo "=== ALIOTH DIRECTORIES ==="
+          find Platforms/Xiaomi/aliothPkg -type d -print | sort
 
-      - name: List platform directories
+      - name: Inspect alioth build files
         run: |
-          echo "Platforms:"
-          find Platforms -maxdepth 3 -type d | sort
+          echo "=== ALIOTH DSC ==="
+          sed -n '1,220p' Platforms/Xiaomi/aliothPkg/alioth.dsc
+
+          echo
+          echo "=== ALIOTH FDF ==="
+          sed -n '1,220p' Platforms/Xiaomi/aliothPkg/alioth.fdf
+
+          echo
+          echo "=== ALIOTH DEC ==="
+          sed -n '1,160p' Platforms/Xiaomi/aliothPkg/alioth.dec
+
+      - name: Inspect alioth libraries
+        run: |
+          echo "=== ALIOTH LIBRARIES ==="
+          find Platforms/Xiaomi/aliothPkg/Library \
+            -type f -print | sort
+
+      - name: Inspect alioth binaries
+        run: |
+          echo "=== ALIOTH BINARIES ==="
+          find Binaries/alioth \
+            -type f -print | sort
+
+      - name: Inspect alioth DTB
+        run: |
+          echo "=== ALIOTH DTB/DTS ==="
+          ls -lh Resources/DTBs/alioth.* 2>/dev/null || true
+
+          echo
+          echo "=== DTB DIRECTORY MATCHES ==="
+          find Resources/DTBs -maxdepth 1 \
+            \( -name "alioth.*" -o -iname "*sm8250*alioth*" \) \
+            -print | sort
+
+      - name: Inspect SM8250 configuration
+        run: |
+          echo "=== ALIOTH SM8250 REFERENCES ==="
+          grep -Rni \
+            --exclude-dir=.git \
+            -E "SM8250|SM8250-AC|Kona" \
+            Platforms/Xiaomi/aliothPkg \
+            Silicon/Qualcomm \
+            2>/dev/null | head -200
+
+      - name: Inspect build configuration
+        run: |
+          echo "=== DEVICE REFERENCES ==="
+          grep -Rni \
+            --exclude-dir=.git \
+            -E "alioth|build_uefi" \
+            build_uefi.py \
+            *.py \
+            Platforms \
+            2>/dev/null | head -250
