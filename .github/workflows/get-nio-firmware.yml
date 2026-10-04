@@ -1,0 +1,73 @@
+name: Get Moto G100 Firmware
+
+on:
+  workflow_dispatch:
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip p7zip-full device-tree-compiler
+
+      - name: Download G100 firmware
+        run: |
+          wget -O nio-firmware.zip \
+            "https://mirrors-obs-1.lolinet.com/firmware/lenomola/2021/nio/official/TIMIT/XT2125-4_NIO_RETEU_12_S1RTS32.41-20-16-1-9_subsidy-DEFAULT_regulatory-DEFAULT_CFC.xml.zip"
+
+      - name: Check downloaded archive
+        run: |
+          ls -lh nio-firmware.zip
+          unzip -l nio-firmware.zip | head -100
+
+      - name: Extract firmware
+        run: |
+          mkdir firmware
+          unzip -q nio-firmware.zip -d firmware
+
+      - name: Find important files
+        run: |
+          echo "===== XBL ====="
+          find firmware -type f \
+            \( -iname "*xbl*" -o -iname "*uefi*" \) \
+            -printf "%p  %k KB\n" | sort
+
+          echo
+          echo "===== BOOT ====="
+          find firmware -type f \
+            \( -iname "boot.img" -o -iname "*boot*" \) \
+            -printf "%p  %k KB\n" | sort
+
+          echo
+          echo "===== DTB ====="
+          find firmware -type f \
+            \( -iname "*.dtb" -o -iname "*.dtbo" \) \
+            -printf "%p  %k KB\n" | sort
+
+          echo
+          echo "===== ALL IMAGE FILES ====="
+          find firmware -type f \
+            \( -iname "*.img" -o -iname "*.bin" \) \
+            -printf "%p  %k KB\n" | sort
+
+      - name: Show archive metadata
+        run: |
+          find firmware -maxdepth 2 -type f \
+            \( -iname "*.xml" -o -iname "*.txt" \) \
+            -print
+
+      - name: Upload firmware pieces
+        uses: actions/upload-artifact@v4
+        with:
+          name: nio-stock-firmware
+          path: |
+            firmware/**/xbl*.img
+            firmware/**/boot.img
+            firmware/**/*.dtb
+            firmware/**/*.dtbo
+            firmware/**/*.bin
+            firmware/**/*.xml
+          if-no-files-found: warn
